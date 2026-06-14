@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, Response
 import requests
 import json
 import os
@@ -6,41 +6,25 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# تنظیمات
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "7255636020:AAE2uVHWtRWmGl2eXjILnGCCG4hYjKsmOIg")
 CHANNEL_ID = os.environ.get("CHANNEL_ID", "-1003211477952")
 TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 TELEGRAM_PHOTO_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ارسال پیام به تلگرام
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def send_telegram(message, photo=None):
     try:
         if photo:
-            data = {
-                "chat_id": CHANNEL_ID,
-                "caption": message,
-                "parse_mode": "HTML"
-            }
+            data = {"chat_id": CHANNEL_ID, "caption": message, "parse_mode": "HTML"}
             files = {"photo": photo}
             r = requests.post(TELEGRAM_PHOTO_URL, data=data, files=files)
         else:
-            data = {
-                "chat_id": CHANNEL_ID,
-                "text": message,
-                "parse_mode": "HTML"
-            }
+            data = {"chat_id": CHANNEL_ID, "text": message, "parse_mode": "HTML"}
             r = requests.post(TELEGRAM_URL, json=data)
-        
         return r.status_code == 200
     except Exception as e:
         print(f"خطا: {e}")
         return False
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ساخت پیام تحلیل بازار
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def build_analysis_message(data):
     symbol = data.get("symbol", "")
     trend = data.get("trend", "")
@@ -53,28 +37,20 @@ def build_analysis_message(data):
     msg += "📊 <b>تحلیل بازار</b>\n\n"
     msg += f"📌 <b>نماد:</b> {symbol}\n"
     msg += f"📈 <b>روند:</b> {trend}\n"
-
     if buy_zone:
         msg += f"🎯 <b>محدوده ورود:</b>\n{buy_zone}\n"
-
     if cancel:
         msg += f"🛑 <b>ابطال تحلیل:</b>\n{cancel}\n"
-
     if targets:
         msg += "\n📍 <b>اهداف:</b>\n"
         for t in targets:
             msg += f"✅ {t}\n"
-
     if description:
         msg += f"\n📝 <b>توضیح:</b>\n{description}\n"
-
     msg += "\n⚠️ این تحلیل آموزشی است.\n"
     msg += "━━━━━━━━━━━━━━"
     return msg
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ساخت پیام ستاپ معاملاتی
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def build_setup_message(data):
     symbol = data.get("symbol", "")
     direction = data.get("direction", "")
@@ -92,90 +68,191 @@ def build_setup_message(data):
     msg += f"📢 <b>ستاپ معاملاتی</b> {emoji}\n\n"
     msg += f"📌 <b>نماد:</b> {symbol}\n"
     msg += f"📊 <b>نوع:</b> {dir_fa}\n"
-
     if entry:
         msg += f"🎯 <b>ناحیه ورود:</b>\n{entry}\n"
-
     if sl:
         msg += f"🛑 <b>استاپ:</b>\n{sl}\n"
-
     if tp1:
         msg += f"\n✅ <b>هدف اول:</b> {tp1}\n"
     if tp2:
         msg += f"✅ <b>هدف دوم:</b> {tp2}\n"
     if tp3:
         msg += f"✅ <b>هدف سوم:</b> {tp3}\n"
-
     if rr:
         msg += f"\n⚖️ <b>RR:</b> {rr}\n"
-
     msg += "\n⚠️ این یک ستاپ آموزشی است.\n"
     msg += "مسئولیت ورود با معامله‌گر است.\n"
     msg += "━━━━━━━━━━━━━━"
     return msg
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Webhook از TradingView
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
         data = request.json
         if not data:
             data = json.loads(request.data)
-
         msg_type = data.get("type", "setup")
-
         if msg_type == "analysis":
             message = build_analysis_message(data)
         else:
             message = build_setup_message(data)
-
         success = send_telegram(message)
         return jsonify({"status": "ok" if success else "error"}), 200
-
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# پنل ساده ارسال دستی
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@app.route("/manifest.json")
+def manifest():
+    data = {
+        "name": "Kamalhaqjo Signal",
+        "short_name": "KSignal",
+        "description": "پنل سیگنال VIP کمال حق‌جو",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#0a0a0a",
+        "theme_color": "#FFD700",
+        "orientation": "portrait",
+        "icons": [
+            {
+                "src": "/icon.png",
+                "sizes": "192x192",
+                "type": "image/png"
+            }
+        ]
+    }
+    return jsonify(data)
+
+@app.route("/sw.js")
+def sw():
+    sw_content = """
+const CACHE_NAME = 'kamalhaqjo-v1';
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['/'])));
+});
+self.addEventListener('fetch', e => {
+  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+});
+"""
+    return Response(sw_content, mimetype='application/javascript')
+
 PANEL_HTML = """
 <!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kamalhaqjo Signal Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="KSignal">
+<meta name="theme-color" content="#FFD700">
+<link rel="manifest" href="/manifest.json">
+<title>🦅 Kamalhaqjo Signal</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0a0a0a; color: #f0f0f0; font-family: Tahoma, sans-serif; padding: 20px; }
-  .container { max-width: 600px; margin: 0 auto; }
-  h1 { color: #FFD700; text-align: center; margin-bottom: 30px; font-size: 22px; }
-  .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-  .tab { flex: 1; padding: 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; 
-         cursor: pointer; text-align: center; color: #aaa; transition: all 0.3s; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { 
+    background: #0a0a0a; 
+    color: #f0f0f0; 
+    font-family: Tahoma, sans-serif; 
+    padding: 16px;
+    min-height: 100vh;
+    padding-bottom: 30px;
+  }
+  .container { max-width: 500px; margin: 0 auto; }
+  h1 { 
+    color: #FFD700; 
+    text-align: center; 
+    margin-bottom: 20px; 
+    font-size: 20px;
+    padding-top: 10px;
+  }
+  .install-btn {
+    display: none;
+    width: 100%;
+    padding: 10px;
+    background: #1a1a1a;
+    border: 1px solid #FFD700;
+    border-radius: 8px;
+    color: #FFD700;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 15px;
+    text-align: center;
+  }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { 
+    flex: 1; 
+    padding: 12px 8px; 
+    background: #1a1a1a; 
+    border: 1px solid #333; 
+    border-radius: 10px; 
+    cursor: pointer; 
+    text-align: center; 
+    color: #aaa; 
+    font-size: 13px;
+    transition: all 0.2s;
+  }
   .tab.active { background: #FFD700; color: #000; font-weight: bold; border-color: #FFD700; }
-  .form-group { margin-bottom: 15px; }
-  label { display: block; margin-bottom: 6px; color: #FFD700; font-size: 14px; }
-  input, textarea, select { width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #333;
-    border-radius: 8px; color: #f0f0f0; font-size: 14px; font-family: Tahoma; }
-  textarea { height: 80px; resize: vertical; }
-  .btn { width: 100%; padding: 14px; background: #FFD700; color: #000; border: none;
-    border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-  .btn:hover { background: #FFC000; }
-  .preview { background: #1a1a1a; border: 1px solid #FFD700; border-radius: 8px; 
-    padding: 15px; margin-top: 20px; white-space: pre-wrap; font-size: 13px; line-height: 1.8; }
-  .success { color: #00ff88; text-align: center; margin-top: 10px; font-weight: bold; }
-  .error { color: #ff4444; text-align: center; margin-top: 10px; }
-  .row { display: flex; gap: 10px; }
+  .form-group { margin-bottom: 12px; }
+  label { display: block; margin-bottom: 5px; color: #FFD700; font-size: 13px; font-weight: bold; }
+  input, textarea, select { 
+    width: 100%; 
+    padding: 12px; 
+    background: #1a1a1a; 
+    border: 1px solid #2a2a2a;
+    border-radius: 10px; 
+    color: #f0f0f0; 
+    font-size: 15px; 
+    font-family: Tahoma;
+    -webkit-appearance: none;
+  }
+  input:focus, textarea:focus, select:focus {
+    border-color: #FFD700;
+    outline: none;
+  }
+  textarea { height: 75px; resize: none; }
+  select { background-image: none; }
+  .btn { 
+    width: 100%; 
+    padding: 16px; 
+    background: #FFD700; 
+    color: #000; 
+    border: none;
+    border-radius: 12px; 
+    font-size: 17px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+  .btn:active { background: #FFC000; transform: scale(0.98); }
+  .row { display: flex; gap: 8px; }
   .row .form-group { flex: 1; }
+  .status { 
+    text-align: center; 
+    margin-top: 12px; 
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: bold;
+  }
+  .status.success { background: #0a2a0a; color: #00ff88; border: 1px solid #00ff88; }
+  .status.error { background: #2a0a0a; color: #ff4444; border: 1px solid #ff4444; }
+  .status.loading { background: #1a1a00; color: #FFD700; border: 1px solid #FFD700; }
+  .divider { 
+    border: none; 
+    border-top: 1px solid #222; 
+    margin: 15px 0; 
+  }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>🦅 پنل سیگنال Kamalhaqjo</h1>
   
+  <button class="install-btn" id="installBtn" onclick="installApp()">
+    📲 نصب اپ روی گوشی
+  </button>
+
   <div class="tabs">
     <div class="tab active" onclick="switchTab('setup')">📢 ستاپ معاملاتی</div>
     <div class="tab" onclick="switchTab('analysis')">📊 تحلیل بازار</div>
@@ -274,6 +351,29 @@ PANEL_HTML = """
 </div>
 
 <script>
+// PWA Install
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBtn').style.display = 'block';
+});
+
+function installApp() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => {
+      deferredPrompt = null;
+      document.getElementById('installBtn').style.display = 'none';
+    });
+  }
+}
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+
 function switchTab(type) {
   document.getElementById('setup-form').style.display = type === 'setup' ? 'block' : 'none';
   document.getElementById('analysis-form').style.display = type === 'analysis' ? 'block' : 'none';
@@ -314,7 +414,8 @@ async function sendAnalysis() {
 
 async function sendToServer(data) {
   const status = document.getElementById('status');
-  status.innerHTML = '<p style="color:#FFD700;text-align:center">در حال ارسال...</p>';
+  status.className = 'status loading';
+  status.innerHTML = '⏳ در حال ارسال...';
   try {
     const res = await fetch('/webhook', {
       method: 'POST',
@@ -323,12 +424,17 @@ async function sendToServer(data) {
     });
     const result = await res.json();
     if (result.status === 'ok') {
-      status.innerHTML = '<p class="success">✅ با موفقیت در کانال نشر شد!</p>';
+      status.className = 'status success';
+      status.innerHTML = '✅ با موفقیت در کانال نشر شد!';
+      // پاک کردن فرم
+      setTimeout(() => { status.innerHTML = ''; }, 3000);
     } else {
-      status.innerHTML = '<p class="error">❌ خطا در ارسال</p>';
+      status.className = 'status error';
+      status.innerHTML = '❌ خطا در ارسال';
     }
   } catch(e) {
-    status.innerHTML = '<p class="error">❌ خطا: ' + e + '</p>';
+    status.className = 'status error';
+    status.innerHTML = '❌ خطا در اتصال به سرور';
   }
 }
 </script>
