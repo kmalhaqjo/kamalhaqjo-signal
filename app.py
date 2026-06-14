@@ -61,8 +61,22 @@ def build_setup_message(data):
     tp3 = data.get("tp3", "")
     rr = data.get("rr", "")
 
-    emoji = "🟢" if direction.upper() == "BUY" else "🔴"
-    dir_fa = "BUY 📈" if direction.upper() == "BUY" else "SELL 📉"
+    dir_upper = direction.upper()
+    if "BUY LIMIT" in dir_upper:
+        emoji = "🟡"
+    elif "SELL LIMIT" in dir_upper:
+        emoji = "🟠"
+    elif "BUY STOP" in dir_upper:
+        emoji = "🔵"
+    elif "SELL STOP" in dir_upper:
+        emoji = "🟣"
+    elif "BUY" in dir_upper:
+        emoji = "🟢"
+    elif "SELL" in dir_upper:
+        emoji = "🔴"
+    else:
+        emoji = "⚪"
+    dir_fa = direction
 
     msg = "━━━━━━━━━━━━━━\n"
     msg += f"📢 <b>ستاپ معاملاتی</b> {emoji}\n\n"
@@ -276,6 +290,10 @@ PANEL_HTML = """
         <select id="s-direction">
           <option value="BUY">BUY 🟢</option>
           <option value="SELL">SELL 🔴</option>
+          <option value="BUY LIMIT">BUY LIMIT 🟡</option>
+          <option value="SELL LIMIT">SELL LIMIT 🟠</option>
+          <option value="BUY STOP">BUY STOP 🔵</option>
+          <option value="SELL STOP">SELL STOP 🟣</option>
         </select>
       </div>
     </div>
